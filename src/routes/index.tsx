@@ -1,11 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  Link,
-  Outlet,
-  createRootRoute,
-  createRoute,
-  createRouter,
-} from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -18,37 +12,6 @@ import {
 } from '@/components/ui/card'
 import { getStackStatus } from '@/lib/demo-api'
 import { useCounterStore } from '@/stores/counter-store'
-
-function RootLayout() {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col border-x">
-        <header className="border-b px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                bdoc
-              </p>
-              <h1 className="font-heading text-xl">Shadcn / Router / Query / Store</h1>
-            </div>
-            <nav className="flex items-center gap-2">
-              <Button variant="outline" render={<Link to="/" />}>
-                Home
-              </Button>
-              <Button variant="outline" render={<Link to="/about" />}>
-                About
-              </Button>
-            </nav>
-          </div>
-        </header>
-
-        <main className="flex-1 px-6 py-8">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  )
-}
 
 function HomePage() {
   const count = useCounterStore((state) => state.count)
@@ -114,49 +77,6 @@ function HomePage() {
   )
 }
 
-function AboutPage() {
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>TanStack Router</CardTitle>
-        <CardDescription>
-          File generation is not required for a small baseline. The router is configured
-          manually and ready to scale.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-muted-foreground">
-        <p>The app now has a root layout, route navigation, query provider, and a store.</p>
-        <p>From here you can split routes into separate files or adopt generated route trees.</p>
-      </CardContent>
-    </Card>
-  )
-}
-
-const rootRoute = createRootRoute({
-  component: RootLayout,
-})
-
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
+export const Route = createFileRoute('/')({
   component: HomePage,
 })
-
-const aboutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/about',
-  component: AboutPage,
-})
-
-const routeTree = rootRoute.addChildren([indexRoute, aboutRoute])
-
-export const router = createRouter({
-  routeTree,
-  defaultPreload: 'intent',
-})
-
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
