@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ApiConsole } from '@/components/api-console'
+import { ApiConsole } from '@/components/api-console/index'
 
 function HomePage() {
   return <ApiConsole />
