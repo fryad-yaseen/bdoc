@@ -31,7 +31,7 @@ export function BodyEditor({
     operation.requestBodyContents.find((c) => c.contentType === selectedContentType)?.example ?? ''
 
   return (
-    <div className="space-y-3 border border-border bg-card p-3">
+    <div className="min-w-0 space-y-3 border border-border bg-card p-3">
       <div className="flex items-center justify-between gap-3">
         <Select
           value={selectedContentType}
@@ -61,7 +61,7 @@ export function BodyEditor({
         ) : null}
       </div>
       <textarea
-        className="min-h-56 w-full overflow-x-auto overflow-y-auto whitespace-pre border border-input bg-background px-2.5 py-2 font-mono text-xs outline-none [overflow-wrap:normal] [word-break:normal] focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
+        className="block min-h-56 w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto whitespace-pre border border-input bg-background px-2.5 py-2 font-mono text-xs outline-none [overflow-wrap:normal] [word-break:normal] focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
         wrap="off"
         spellCheck={false}
         value={bodyValue}

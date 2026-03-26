@@ -35,7 +35,7 @@ export function ResponsePanel({
   onTabChange: (value: 'response' | 'expected') => void
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col border-t border-border bg-card">
+    <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-border bg-card">
       {error ? (
         <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
@@ -80,8 +80,8 @@ export function ResponsePanel({
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="body" className="min-h-0 flex-1 px-4 py-4">
-                <div className="flex h-full min-h-0 flex-col gap-3">
+              <TabsContent value="body" className="min-h-0 min-w-0 flex-1 px-4 py-4">
+                <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={result.ok ? 'secondary' : 'destructive'}>
                       {result.status} {result.statusText}
@@ -90,7 +90,7 @@ export function ResponsePanel({
                       {Math.round(result.durationMs)} ms
                     </Badge>
                   </div>
-                  <div className="h-full overflow-auto border border-border bg-background">
+                  <div className="h-full min-w-0 overflow-x-auto overflow-y-auto border border-border bg-background">
                     <pre className="min-w-max p-3 text-xs leading-5 font-mono whitespace-pre [overflow-wrap:normal] [word-break:normal]">
                       {formatJson(result.body) || 'Empty response body'}
                     </pre>
