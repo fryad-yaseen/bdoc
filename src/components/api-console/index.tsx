@@ -1,13 +1,14 @@
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react'
+import { useHotkey } from '@tanstack/react-hotkeys'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import {
   buildRequestUrl,
   createInitialDraft,
   type ApiOperation,
+  getFetchTarget,
   type NormalizedSpec,
   loadOpenApiSpec,
 } from '@/lib/openapi'
@@ -42,7 +43,6 @@ function groupOperations(operations: ApiOperation[]) {
 export function ApiConsole() {
   const authToken = useApiConsoleStore((state) => state.authToken)
   const drafts = useApiConsoleStore((state) => state.drafts)
-  const recentSpecs = useApiConsoleStore((state) => state.recentSpecs)
   const savedSpecUrl = useApiConsoleStore((state) => state.specUrl)
   const selectedOperationKey = useApiConsoleStore((state) => state.selectedOperationKey)
   const ensureDraft = useApiConsoleStore((state) => state.ensureDraft)
@@ -61,6 +61,8 @@ export function ApiConsole() {
   const [search, setSearch] = useState('')
   const [requestError, setRequestError] = useState('')
   const [requestResult, setRequestResult] = useState<RequestResult | null>(null)
+  const [isExecutingRequest, setIsExecutingRequest] = useState(false)
+  const [activeResponseTab, setActiveResponseTab] = useState<'response' | 'expected'>('response')
   const [isPending, startTransition] = useTransition()
   const deferredSearch = useDeferredValue(search)
 
@@ -140,9 +142,11 @@ export function ApiConsole() {
   }
 
   const executeRequest = async () => {
-    if (!spec || !selectedOperation || !activeDraft) return
+    if (!spec || !selectedOperation || !activeDraft || isExecutingRequest) return
     setRequestError('')
     setRequestResult(null)
+    setActiveResponseTab('response')
+    setIsExecutingRequest(true)
 
     try {
       const url = buildRequestUrl(
@@ -170,7 +174,7 @@ export function ApiConsole() {
       }
 
       const startedAt = performance.now()
-      const response = await fetch(url, {
+      const response = await fetch(getFetchTarget(url), {
         method: selectedOperation.method.toUpperCase(),
         headers,
         body: selectedBody.trim() ? selectedBody : undefined,
@@ -190,15 +194,46 @@ export function ApiConsole() {
       setRequestError(
         error instanceof Error ? error.message : 'The request failed before a response was returned.',
       )
+    } finally {
+      setIsExecutingRequest(false)
     }
   }
+
+  useHotkey(
+    'Control+Enter',
+    () => {
+      void executeRequest()
+    },
+    {
+      enabled: Boolean(spec && selectedOperation && activeDraft),
+    },
+  )
+
+  useHotkey(
+    'Mod+Z',
+    () => {
+      const activeElement = document.activeElement
+      const isEditable =
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLElement
+
+      if (!isEditable) {
+        return
+      }
+
+      document.execCommand('undo')
+    },
+    {
+      enabled: true,
+    },
+  )
 
   const sidebarContent = (
     <Sidebar
       groupedOperations={groupedOperations}
       onLoadSpec={loadSpec}
       onSelectOperation={setSelectedOperationKey}
-      recentSpecs={recentSpecs}
       search={search}
       selectedOperationKey={selectedOperationKey}
       setSearch={setSearch}
@@ -208,15 +243,15 @@ export function ApiConsole() {
   )
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="h-screen overflow-hidden bg-background text-foreground">
+      <div className="grid h-full overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* Sidebar */}
-        <aside className="hidden border-r border-border bg-muted/20 lg:block">
+        <aside className="hidden h-full overflow-hidden border-r border-sidebar-border lg:block">
           {sidebarContent}
         </aside>
 
         {/* Main content */}
-        <main className="flex min-h-screen min-w-0 flex-col">
+        <main className="flex h-full min-w-0 flex-col overflow-hidden">
           {/* Mobile sidebar trigger */}
           <div className="border-b border-border px-4 py-2 lg:hidden">
             <Sheet>
@@ -241,55 +276,58 @@ export function ApiConsole() {
 
           {/* Content area */}
           {!spec ? (
-            <WelcomeScreen isLoading={isPending} />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <WelcomeScreen isLoading={isPending} />
+            </div>
           ) : selectedOperation && activeDraft ? (
-            <ScrollArea className="h-[calc(100vh-1px)] lg:h-screen">
-              <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-8">
-                {/* Operation header with Send button */}
-                <OperationHeader
+            <div className="flex min-h-0 flex-1 flex-col">
+              <OperationHeader
+                operation={selectedOperation}
+                canSend={!!activeDraft}
+                isSending={isExecutingRequest}
+                onSend={executeRequest}
+              />
+
+              <UrlBar
+                servers={spec.servers}
+                selectedServerUrl={activeDraft.selectedServerUrl}
+                onServerChange={(url) => setSelectedServerUrl(draftKey, url)}
+                path={selectedOperation.path}
+                pathParams={activeDraft.pathParams}
+                queryParams={activeDraft.queryParams}
+              />
+
+              <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(260px,0.75fr)_28px]">
+                <ScrollArea className="min-h-0">
+                  <RequestBuilder
+                    operation={selectedOperation}
+                    spec={spec}
+                    draft={activeDraft}
+                    authToken={authToken}
+                    draftKey={draftKey}
+                    onAuthTokenChange={setAuthToken}
+                    onDraftField={setDraftField}
+                    onBodyChange={setBodyValue}
+                    onContentTypeChange={setSelectedContentType}
+                  />
+                </ScrollArea>
+
+                <ResponsePanel
                   operation={selectedOperation}
-                  canSend={!!activeDraft}
-                  onSend={executeRequest}
+                  result={requestResult}
+                  error={requestError}
+                  isLoading={isExecutingRequest}
+                  activeTab={activeResponseTab}
+                  onTabChange={setActiveResponseTab}
                 />
 
-                <Separator />
-
-                {/* URL bar */}
-                <UrlBar
-                  servers={spec.servers}
-                  selectedServerUrl={activeDraft.selectedServerUrl}
-                  onServerChange={(url) => setSelectedServerUrl(draftKey, url)}
-                  path={selectedOperation.path}
-                  pathParams={activeDraft.pathParams}
-                  queryParams={activeDraft.queryParams}
-                />
-
-                <Separator />
-
-                {/* Request builder with tabs */}
-                <RequestBuilder
-                  operation={selectedOperation}
-                  spec={spec}
-                  draft={activeDraft}
-                  authToken={authToken}
-                  draftKey={draftKey}
-                  onAuthTokenChange={setAuthToken}
-                  onDraftField={setDraftField}
-                  onBodyChange={setBodyValue}
-                  onContentTypeChange={setSelectedContentType}
-                />
-
-                {/* Response panel — always visible below */}
-                <ResponsePanel result={requestResult} error={requestError} />
-
-                {/* CORS note */}
-                <p className="pb-4 text-xs text-muted-foreground">
-                  Requests are sent directly from the browser. Target APIs need CORS to allow them.
-                </p>
+                <div className="flex items-center border-t border-border px-4 text-[11px] text-muted-foreground">
+                  In dev, cross-origin requests are proxied through Vite.
+                </div>
               </div>
-            </ScrollArea>
+            </div>
           ) : (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
               <p className="text-sm text-muted-foreground">
                 No endpoints match the current filter.
               </p>

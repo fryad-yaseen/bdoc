@@ -8,7 +8,6 @@ export function Sidebar({
   groupedOperations,
   onLoadSpec,
   onSelectOperation,
-  recentSpecs,
   search,
   selectedOperationKey,
   setSearch,
@@ -18,7 +17,6 @@ export function Sidebar({
   groupedOperations: Record<string, ApiOperation[]>
   onLoadSpec: (url: string) => void
   onSelectOperation: (operationKey: string) => void
-  recentSpecs: Array<{ title: string; url: string }>
   search: string
   selectedOperationKey: string
   setSearch: (value: string) => void
@@ -26,22 +24,21 @@ export function Sidebar({
   specInput: string
 }) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-4 py-4">
-        <p className="text-xs font-medium text-muted-foreground">bdoc</p>
-        <h1 className="mt-1 text-base font-semibold">API Console</h1>
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="border-b border-sidebar-border px-3 py-3">
+        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">bdoc</p>
+        <h1 className="mt-1 text-sm font-semibold">Collections</h1>
       </div>
 
-      <div className="border-b border-border px-4 py-4">
+      <div className="border-b border-sidebar-border px-3 py-3">
         <SpecLoader
           specInput={specInput}
           setSpecInput={setSpecInput}
           onLoadSpec={onLoadSpec}
-          recentSpecs={recentSpecs}
         />
       </div>
 
-      <div className="border-b border-border px-4 py-3">
+      <div className="border-b border-sidebar-border px-3 py-2">
         <div className="relative">
           <svg
             className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
@@ -60,13 +57,13 @@ export function Sidebar({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Filter endpoints…"
-            className="pl-8"
+            className="h-8 border-sidebar-border bg-sidebar-accent pl-8"
           />
         </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-2 py-3">
+        <div className="px-1 py-2">
           <EndpointList
             groupedOperations={groupedOperations}
             selectedOperationKey={selectedOperationKey}

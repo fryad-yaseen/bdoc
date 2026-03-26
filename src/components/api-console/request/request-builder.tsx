@@ -1,13 +1,5 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { ApiOperation, NormalizedSpec } from '@/lib/openapi'
-import { formatJson } from '../shared/format-json'
 import { AuthSection } from './auth-section'
 import { BodyEditor } from './body-editor'
 import { ParameterSection } from './parameter-section'
@@ -57,9 +49,9 @@ export function RequestBuilder({
   const defaultTab = hasParams ? 'params' : hasBody ? 'body' : 'auth'
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full min-h-0 flex-col">
       <Tabs defaultValue={defaultTab}>
-        <TabsList variant="line">
+        <TabsList variant="line" className="border-b border-border px-4">
           <TabsTrigger value="params">
             Params
             {hasParams ? (
@@ -80,10 +72,10 @@ export function RequestBuilder({
           <TabsTrigger value="headers">Headers</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="params" className="space-y-5 pt-4">
+        <TabsContent value="params" className="space-y-4 px-4 py-4">
           {hasPathParams ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Path parameters</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Path parameters</p>
               <ParameterSection
                 location="path"
                 operation={operation}
@@ -94,7 +86,7 @@ export function RequestBuilder({
           ) : null}
           {hasQueryParams ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Query parameters</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Query parameters</p>
               <ParameterSection
                 location="query"
                 operation={operation}
@@ -110,7 +102,7 @@ export function RequestBuilder({
           ) : null}
         </TabsContent>
 
-        <TabsContent value="body" className="pt-4">
+        <TabsContent value="body" className="px-4 py-4">
           <BodyEditor
             operation={operation}
             selectedContentType={draft.selectedContentType}
@@ -120,7 +112,7 @@ export function RequestBuilder({
           />
         </TabsContent>
 
-        <TabsContent value="auth" className="pt-4">
+        <TabsContent value="auth" className="px-4 py-4">
           <AuthSection
             authToken={authToken}
             onAuthTokenChange={onAuthTokenChange}
@@ -129,7 +121,7 @@ export function RequestBuilder({
           />
         </TabsContent>
 
-        <TabsContent value="headers" className="pt-4">
+        <TabsContent value="headers" className="px-4 py-4">
           {hasHeaderParams ? (
             <ParameterSection
               location="header"
@@ -145,66 +137,6 @@ export function RequestBuilder({
         </TabsContent>
       </Tabs>
 
-      {/* Expected Responses collapsible */}
-      {operation.responses.length > 0 ? (
-        <div className="space-y-2">
-          <Accordion>
-            <AccordionItem value="expected-responses" className="border rounded-lg">
-              <AccordionTrigger className="px-4 py-3">
-                <span className="text-sm font-medium">
-                  Expected Responses ({operation.responses.length})
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <Accordion>
-                  {operation.responses.map((response) => (
-                    <AccordionItem key={response.statusCode} value={response.statusCode}>
-                      <AccordionTrigger>
-                        <div className="flex items-center gap-3">
-                          <Badge variant={response.statusCode.startsWith('2') ? 'secondary' : 'outline'}>
-                            {response.statusCode}
-                          </Badge>
-                          <span className="text-sm">{response.description || 'Response'}</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3">
-                        {response.contents.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
-                            No response body defined.
-                          </p>
-                        ) : (
-                          response.contents.map((content) => (
-                            <div
-                              key={`${response.statusCode}-${content.contentType}`}
-                              className="space-y-2 border-l-2 border-border pl-3"
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline">{content.contentType}</Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {content.schemaLabel}
-                                </span>
-                              </div>
-                              {content.example ? (
-                                <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-3 text-xs leading-5">
-                                  {formatJson(content.example)}
-                                </pre>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">
-                                  No example body provided.
-                                </p>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      ) : null}
     </div>
   )
 }

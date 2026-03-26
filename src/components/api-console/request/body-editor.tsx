@@ -6,7 +6,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import type { ApiOperation } from '@/lib/openapi'
 
 export function BodyEditor({
@@ -32,7 +31,7 @@ export function BodyEditor({
     operation.requestBodyContents.find((c) => c.contentType === selectedContentType)?.example ?? ''
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 border border-border bg-card p-3">
       <div className="flex items-center justify-between gap-3">
         <Select
           value={selectedContentType}
@@ -40,7 +39,7 @@ export function BodyEditor({
             if (value) onContentTypeChange(value)
           }}
         >
-          <SelectTrigger size="sm" className="w-auto">
+          <SelectTrigger size="sm" className="w-auto bg-background">
             <SelectValue placeholder="Content type" />
           </SelectTrigger>
           <SelectContent>
@@ -61,8 +60,10 @@ export function BodyEditor({
           </Button>
         ) : null}
       </div>
-      <Textarea
-        className="min-h-48 font-mono text-xs"
+      <textarea
+        className="min-h-56 w-full overflow-x-auto overflow-y-auto whitespace-pre border border-input bg-background px-2.5 py-2 font-mono text-xs outline-none [overflow-wrap:normal] [word-break:normal] focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50"
+        wrap="off"
+        spellCheck={false}
         value={bodyValue}
         onChange={(event) => onBodyChange(event.target.value)}
         placeholder="Request body…"

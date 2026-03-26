@@ -6,6 +6,8 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import './index.css'
 import { routeTree } from './routeTree.gen'
 
+document.documentElement.classList.add('dark')
+
 const queryClient = new QueryClient()
 const router = createRouter({
   routeTree,

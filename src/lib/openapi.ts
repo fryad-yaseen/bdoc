@@ -470,7 +470,7 @@ function operationSupportsBearerAuth(
 }
 
 export async function loadOpenApiSpec(sourceUrl: string): Promise<NormalizedSpec> {
-  const response = await fetch(sourceUrl)
+  const response = await fetch(getFetchTarget(sourceUrl))
   if (!response.ok) {
     throw new Error(`Failed to load spec: ${response.status} ${response.statusText}`)
   }
@@ -565,6 +565,19 @@ export async function loadOpenApiSpec(sourceUrl: string): Promise<NormalizedSpec
   }
 }
 
+export function getFetchTarget(url: string): string {
+  if (!import.meta.env.DEV || typeof window === 'undefined') {
+    return url
+  }
+
+  const target = new URL(url, window.location.href)
+  if (target.origin === window.location.origin) {
+    return target.toString()
+  }
+
+  return `/__bdoc_proxy?url=${encodeURIComponent(target.toString())}`
+}
+
 export function createInitialDraft(operation: ApiOperation): RequestDraftSeed {
   const pathParams: Record<string, string> = {}
   const queryParams: Record<string, string> = {}
@@ -612,12 +625,17 @@ export function buildRequestUrl(
     compiledPath = compiledPath.replaceAll(`{${name}}`, encodeURIComponent(value))
   }
 
-  const url = new URL(compiledPath, serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`)
+  const baseUrl = new URL(serverUrl)
+  const basePath = baseUrl.pathname.replace(/\/+$/, '')
+  const operationPath = compiledPath.replace(/^\/+/, '')
+
+  baseUrl.pathname = `${basePath}/${operationPath}`.replace(/\/{2,}/g, '/')
+
   for (const [name, value] of Object.entries(queryParams)) {
     if (value.trim().length > 0) {
-      url.searchParams.set(name, value)
+      baseUrl.searchParams.set(name, value)
     }
   }
 
-  return url.toString()
+  return baseUrl.toString()
 }

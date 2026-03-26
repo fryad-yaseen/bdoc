@@ -1,9 +1,4 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
+import { useEffect, useState } from 'react'
 import type { ApiOperation } from '@/lib/openapi'
 import { EndpointItem } from './endpoint-item'
 
@@ -17,6 +12,29 @@ export function EndpointList({
   onSelectOperation: (operationKey: string) => void
 }) {
   const tags = Object.keys(groupedOperations)
+  const [openTags, setOpenTags] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setOpenTags((current) => {
+      const next = { ...current }
+      for (const tag of tags) {
+        if (next[tag] === undefined) {
+          next[tag] = true
+        }
+      }
+
+      for (const tag of tags) {
+        const hasSelectedOperation = groupedOperations[tag]?.some(
+          (operation) => operation.key === selectedOperationKey,
+        )
+        if (hasSelectedOperation) {
+          next[tag] = true
+        }
+      }
+
+      return next
+    })
+  }, [groupedOperations, selectedOperationKey, tags])
 
   if (tags.length === 0) {
     return (
@@ -27,32 +45,38 @@ export function EndpointList({
   }
 
   return (
-    <Accordion>
+    <div className="space-y-1">
       {tags.map((tag) => {
         const operations = groupedOperations[tag]
+        const isOpen = openTags[tag] ?? true
         return (
-          <AccordionItem key={tag} value={tag} className="border-b-0">
-            <AccordionTrigger className="px-2">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold">{tag}</p>
-                <p className="text-xs font-normal text-muted-foreground">
-                  {operations.length} endpoint{operations.length === 1 ? '' : 's'}
-                </p>
+          <section key={tag}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px] font-semibold hover:bg-accent/40"
+              onClick={() => setOpenTags((current) => ({ ...current, [tag]: !isOpen }))}
+            >
+              <span className="w-3 text-center text-muted-foreground">{isOpen ? '▾' : '▸'}</span>
+              <span className="truncate">{tag}</span>
+              <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                {operations.length}
+              </span>
+            </button>
+            {isOpen ? (
+              <div className="ml-3 border-l border-border/70 py-1">
+                {operations.map((operation) => (
+                  <EndpointItem
+                    key={operation.key}
+                    operation={operation}
+                    selected={operation.key === selectedOperationKey}
+                    onClick={() => onSelectOperation(operation.key)}
+                  />
+                ))}
               </div>
-            </AccordionTrigger>
-            <AccordionContent className="space-y-1 pb-3">
-              {operations.map((operation) => (
-                <EndpointItem
-                  key={operation.key}
-                  operation={operation}
-                  selected={operation.key === selectedOperationKey}
-                  onClick={() => onSelectOperation(operation.key)}
-                />
-              ))}
-            </AccordionContent>
-          </AccordionItem>
+            ) : null}
+          </section>
         )
       })}
-    </Accordion>
+    </div>
   )
 }

@@ -28,7 +28,7 @@ export function UrlBar({
   const serverDescription = servers.find((s) => s.resolvedUrl === selectedServerUrl)?.description
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 border-b border-border px-4 py-3">
       <div className="flex items-center gap-2">
         <Select
           value={selectedServerUrl}
@@ -36,7 +36,7 @@ export function UrlBar({
             if (value) onServerChange(value)
           }}
         >
-          <SelectTrigger className="w-48 shrink-0">
+          <SelectTrigger className="h-9 w-52 shrink-0 bg-card">
             <SelectValue placeholder="Server" />
           </SelectTrigger>
           <SelectContent>
@@ -50,11 +50,11 @@ export function UrlBar({
         <Input
           value={resolvedUrl}
           readOnly
-          className="flex-1 font-mono text-xs text-muted-foreground"
+          className="h-9 flex-1 bg-card font-mono text-xs text-foreground"
         />
       </div>
       {serverDescription ? (
-        <p className="text-xs text-muted-foreground">{serverDescription}</p>
+        <p className="text-[11px] text-muted-foreground">{serverDescription}</p>
       ) : null}
     </div>
   )
