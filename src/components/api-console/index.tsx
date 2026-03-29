@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react'
+import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from 'react'
 import { useHotkey } from '@tanstack/react-hotkeys'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,13 @@ type RequestResult = {
   statusText: string
 }
 
+type RequestErrorState = {
+  body?: string
+  message: string
+  status?: number
+  statusText?: string
+}
+
 function groupOperations(operations: ApiOperation[]) {
   return operations.reduce<Record<string, ApiOperation[]>>((groups, operation) => {
     if (!groups[operation.tag]) {
@@ -41,15 +48,19 @@ function groupOperations(operations: ApiOperation[]) {
 }
 
 export function ApiConsole() {
+  const minRequestPanelHeight = 240
+  const minResponsePanelHeight = 220
   const authToken = useApiConsoleStore((state) => state.authToken)
   const drafts = useApiConsoleStore((state) => state.drafts)
   const savedSpecUrl = useApiConsoleStore((state) => state.specUrl)
+  const responseViewMode = useApiConsoleStore((state) => state.responseViewMode)
   const selectedOperationKey = useApiConsoleStore((state) => state.selectedOperationKey)
   const ensureDraft = useApiConsoleStore((state) => state.ensureDraft)
   const rememberSpec = useApiConsoleStore((state) => state.rememberSpec)
   const setAuthToken = useApiConsoleStore((state) => state.setAuthToken)
   const setBodyValue = useApiConsoleStore((state) => state.setBodyValue)
   const setDraftField = useApiConsoleStore((state) => state.setDraftField)
+  const setResponseViewMode = useApiConsoleStore((state) => state.setResponseViewMode)
   const setSelectedContentType = useApiConsoleStore((state) => state.setSelectedContentType)
   const setSelectedOperationKey = useApiConsoleStore((state) => state.setSelectedOperationKey)
   const setSelectedServerUrl = useApiConsoleStore((state) => state.setSelectedServerUrl)
@@ -59,12 +70,15 @@ export function ApiConsole() {
   const [spec, setSpec] = useState<NormalizedSpec | null>(null)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
-  const [requestError, setRequestError] = useState('')
+  const [requestError, setRequestError] = useState<RequestErrorState | null>(null)
   const [requestResult, setRequestResult] = useState<RequestResult | null>(null)
   const [isExecutingRequest, setIsExecutingRequest] = useState(false)
   const [activeResponseTab, setActiveResponseTab] = useState<'response' | 'expected'>('response')
+  const [responsePanelHeight, setResponsePanelHeight] = useState(320)
   const [isPending, startTransition] = useTransition()
   const deferredSearch = useDeferredValue(search)
+  const contentSplitRef = useRef<HTMLDivElement | null>(null)
+  const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
   useEffect(() => {
     if (!savedSpecUrl) return
@@ -131,7 +145,7 @@ export function ApiConsole() {
         const nextSpec = await loadOpenApiSpec(trimmedUrl)
         setSpec(nextSpec)
         setLoadError('')
-        setRequestError('')
+        setRequestError(null)
         setRequestResult(null)
         rememberSpec({ title: nextSpec.title, url: trimmedUrl })
         setSelectedOperationKey(nextSpec.operations[0]?.key ?? '')
@@ -143,7 +157,7 @@ export function ApiConsole() {
 
   const executeRequest = async () => {
     if (!spec || !selectedOperation || !activeDraft || isExecutingRequest) return
-    setRequestError('')
+    setRequestError(null)
     setRequestResult(null)
     setActiveResponseTab('response')
     setIsExecutingRequest(true)
@@ -190,9 +204,23 @@ export function ApiConsole() {
         status: response.status,
         statusText: response.statusText,
       })
+
+      if (!response.ok) {
+        setRequestError({
+          body,
+          message: `Request failed with ${response.status} ${response.statusText}`.trim(),
+          status: response.status,
+          statusText: response.statusText,
+        })
+      }
     } catch (error) {
       setRequestError(
-        error instanceof Error ? error.message : 'The request failed before a response was returned.',
+        {
+          message:
+            error instanceof Error
+              ? error.message
+              : 'The request failed before a response was returned.',
+        },
       )
     } finally {
       setIsExecutingRequest(false)
@@ -241,6 +269,43 @@ export function ApiConsole() {
       specInput={specInput}
     />
   )
+
+  const stopResponseResize = useEffectEvent(() => {
+    dragStateRef.current = null
+    document.body.style.removeProperty('cursor')
+    document.body.style.removeProperty('user-select')
+  })
+
+  const updateResponseHeight = useEffectEvent((nextHeight: number) => {
+    const splitRect = contentSplitRef.current?.getBoundingClientRect()
+    if (!splitRect) return
+
+    const maxResponseHeight = Math.max(
+      minResponsePanelHeight,
+      splitRect.height - minRequestPanelHeight - 28 - 8,
+    )
+
+    setResponsePanelHeight(Math.min(Math.max(nextHeight, minResponsePanelHeight), maxResponseHeight))
+  })
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragStateRef.current) return
+      updateResponseHeight(dragStateRef.current.startHeight - (event.clientY - dragStateRef.current.startY))
+    }
+
+    const handlePointerUp = () => {
+      stopResponseResize()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [stopResponseResize, updateResponseHeight])
 
   return (
     <div className="h-screen overflow-hidden bg-background text-foreground">
@@ -297,7 +362,11 @@ export function ApiConsole() {
                 queryParams={activeDraft.queryParams}
               />
 
-              <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(260px,0.75fr)_28px]">
+              <div
+                ref={contentSplitRef}
+                className="grid min-h-0 flex-1"
+                style={{ gridTemplateRows: `minmax(0,1fr) 8px ${responsePanelHeight}px 28px` }}
+              >
                 <ScrollArea className="min-h-0">
                   <RequestBuilder
                     operation={selectedOperation}
@@ -312,6 +381,23 @@ export function ApiConsole() {
                   />
                 </ScrollArea>
 
+                <div
+                  role="separator"
+                  aria-label="Resize response panel"
+                  aria-orientation="horizontal"
+                  className="group flex cursor-row-resize items-center justify-center bg-background"
+                  onPointerDown={(event) => {
+                    dragStateRef.current = {
+                      startY: event.clientY,
+                      startHeight: responsePanelHeight,
+                    }
+                    document.body.style.cursor = 'row-resize'
+                    document.body.style.userSelect = 'none'
+                  }}
+                >
+                  <div className="h-px w-full bg-border transition-colors group-hover:bg-primary/60" />
+                </div>
+
                 <ResponsePanel
                   operation={selectedOperation}
                   result={requestResult}
@@ -319,6 +405,8 @@ export function ApiConsole() {
                   isLoading={isExecutingRequest}
                   activeTab={activeResponseTab}
                   onTabChange={setActiveResponseTab}
+                  responseViewMode={responseViewMode}
+                  onResponseViewModeChange={setResponseViewMode}
                 />
 
                 <div className="flex items-center border-t border-border px-4 text-[11px] text-muted-foreground">

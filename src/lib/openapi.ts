@@ -291,6 +291,30 @@ function extractMediaExample(
   return ''
 }
 
+function extractParameterExample(
+  document: OpenApiDocument,
+  parameter: Record<string, unknown>,
+  schema: OpenApiSchema | undefined,
+): string {
+  if (parameter.example !== undefined) {
+    return stringifyExample(parameter.example)
+  }
+
+  if (isRecord(parameter.examples)) {
+    const firstExample = Object.values(parameter.examples)[0]
+    const resolvedExample = resolveMaybeRef(document, firstExample)
+    if (isRecord(resolvedExample) && resolvedExample.value !== undefined) {
+      return stringifyExample(resolvedExample.value)
+    }
+  }
+
+  if (schema && schema.example !== undefined) {
+    return stringifyExample(schema.example)
+  }
+
+  return ''
+}
+
 function normalizeParameter(
   document: OpenApiDocument,
   parameter: unknown,
@@ -310,9 +334,7 @@ function normalizeParameter(
     : undefined
 
   const exampleValue =
-    resolved.example !== undefined
-      ? stringifyExample(resolved.example)
-      : stringifyExample(buildExampleValue(document, schema))
+    extractParameterExample(document, resolved, schema)
 
   const defaultValue =
     schema && schema.default !== undefined ? stringifyExample(schema.default) : ''

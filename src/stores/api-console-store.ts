@@ -17,6 +17,7 @@ type ApiConsoleState = {
   authToken: string
   drafts: Record<string, RequestDraft>
   recentSpecs: RecentSpec[]
+  responseViewMode: 'auto' | 'json' | 'text'
   selectedOperationKey: string
   specUrl: string
   ensureDraft: (draftKey: string, seed: RequestDraft) => void
@@ -28,6 +29,7 @@ type ApiConsoleState = {
     name: string,
     value: string,
   ) => void
+  setResponseViewMode: (mode: 'auto' | 'json' | 'text') => void
   setSelectedContentType: (draftKey: string, contentType: string) => void
   setSelectedOperationKey: (operationKey: string) => void
   setSelectedServerUrl: (draftKey: string, serverUrl: string) => void
@@ -57,6 +59,7 @@ export const useApiConsoleStore = create<ApiConsoleState>()(
       authToken: '',
       drafts: {},
       recentSpecs: [],
+      responseViewMode: 'auto',
       selectedOperationKey: '',
       specUrl: '',
       ensureDraft: (draftKey, seed) =>
@@ -114,6 +117,7 @@ export const useApiConsoleStore = create<ApiConsoleState>()(
             },
           },
         })),
+      setResponseViewMode: (mode) => set({ responseViewMode: mode }),
       setSelectedContentType: (draftKey, contentType) =>
         set((state) => ({
           drafts: {

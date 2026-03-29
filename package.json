@@ -17,9 +17,9 @@
     "@tanstack/intent": "^0.0.23",
     "@tanstack/react-hotkeys": "^0.7.0",
     "@tanstack/react-query": "^5.95.2",
-    "@tanstack/react-router": "^1.168.3",
+    "@tanstack/react-router": "^1.168.4",
     "@tanstack/react-router-devtools": "^1.166.11",
-    "@tanstack/router-core": "^1.168.3",
+    "@tanstack/router-core": "^1.168.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react": "^19.2.4",
@@ -32,9 +32,9 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@eslint/js": "^9.39.4",
-    "@rolldown/plugin-babel": "^0.2.1",
+    "@rolldown/plugin-babel": "^0.2.2",
     "@tailwindcss/vite": "^4.2.2",
-    "@tanstack/router-plugin": "^1.167.4",
+    "@tanstack/router-plugin": "^1.167.5",
     "@types/babel__core": "^7.20.5",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
@@ -47,7 +47,7 @@
     "globals": "^17.4.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.57.0",
-    "vite": "^8.0.1"
+    "typescript-eslint": "^8.57.2",
+    "vite": "^8.0.3"
   }
 }
