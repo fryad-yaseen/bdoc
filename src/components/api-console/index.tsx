@@ -37,6 +37,9 @@ type RequestErrorState = {
   statusText?: string
 }
 
+type RequestStateByOperation = Record<string, RequestResult | null>
+type RequestErrorStateByOperation = Record<string, RequestErrorState | null>
+
 function groupOperations(operations: ApiOperation[]) {
   return operations.reduce<Record<string, ApiOperation[]>>((groups, operation) => {
     if (!groups[operation.tag]) {
@@ -70,9 +73,9 @@ export function ApiConsole() {
   const [spec, setSpec] = useState<NormalizedSpec | null>(null)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
-  const [requestError, setRequestError] = useState<RequestErrorState | null>(null)
-  const [requestResult, setRequestResult] = useState<RequestResult | null>(null)
-  const [isExecutingRequest, setIsExecutingRequest] = useState(false)
+  const [requestErrorsByOperation, setRequestErrorsByOperation] = useState<RequestErrorStateByOperation>({})
+  const [requestResultsByOperation, setRequestResultsByOperation] = useState<RequestStateByOperation>({})
+  const [executingRequestKey, setExecutingRequestKey] = useState('')
   const [activeResponseTab, setActiveResponseTab] = useState<'response' | 'expected'>('response')
   const [responsePanelHeight, setResponsePanelHeight] = useState(320)
   const [isPending, startTransition] = useTransition()
@@ -124,6 +127,9 @@ export function ApiConsole() {
 
   const draftKey = spec && selectedOperation ? getDraftKey(spec.sourceUrl, selectedOperation.key) : ''
   const activeDraft = draftKey ? drafts[draftKey] : undefined
+  const requestResult = draftKey ? requestResultsByOperation[draftKey] ?? null : null
+  const requestError = draftKey ? requestErrorsByOperation[draftKey] ?? null : null
+  const isExecutingRequest = draftKey.length > 0 && executingRequestKey === draftKey
 
   useEffect(() => {
     if (!spec || !selectedOperation) return
@@ -145,8 +151,9 @@ export function ApiConsole() {
         const nextSpec = await loadOpenApiSpec(trimmedUrl)
         setSpec(nextSpec)
         setLoadError('')
-        setRequestError(null)
-        setRequestResult(null)
+        setRequestErrorsByOperation({})
+        setRequestResultsByOperation({})
+        setExecutingRequestKey('')
         rememberSpec({ title: nextSpec.title, url: trimmedUrl })
         setSelectedOperationKey(nextSpec.operations[0]?.key ?? '')
       } catch (error) {
@@ -157,10 +164,16 @@ export function ApiConsole() {
 
   const executeRequest = async () => {
     if (!spec || !selectedOperation || !activeDraft || isExecutingRequest) return
-    setRequestError(null)
-    setRequestResult(null)
+    setRequestErrorsByOperation((current) => ({
+      ...current,
+      [draftKey]: null,
+    }))
+    setRequestResultsByOperation((current) => ({
+      ...current,
+      [draftKey]: null,
+    }))
     setActiveResponseTab('response')
-    setIsExecutingRequest(true)
+    setExecutingRequestKey(draftKey)
 
     try {
       const url = buildRequestUrl(
@@ -196,34 +209,41 @@ export function ApiConsole() {
       const durationMs = performance.now() - startedAt
       const body = await response.text()
 
-      setRequestResult({
-        body,
-        durationMs,
-        headers: [...response.headers.entries()],
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      })
-
-      if (!response.ok) {
-        setRequestError({
+      setRequestResultsByOperation((current) => ({
+        ...current,
+        [draftKey]: {
           body,
-          message: `Request failed with ${response.status} ${response.statusText}`.trim(),
+          durationMs,
+          headers: [...response.headers.entries()],
+          ok: response.ok,
           status: response.status,
           statusText: response.statusText,
-        })
+        },
+      }))
+
+      if (!response.ok) {
+        setRequestErrorsByOperation((current) => ({
+          ...current,
+          [draftKey]: {
+            body,
+            message: `Request failed with ${response.status} ${response.statusText}`.trim(),
+            status: response.status,
+            statusText: response.statusText,
+          },
+        }))
       }
     } catch (error) {
-      setRequestError(
-        {
+      setRequestErrorsByOperation((current) => ({
+        ...current,
+        [draftKey]: {
           message:
             error instanceof Error
               ? error.message
               : 'The request failed before a response was returned.',
         },
-      )
+      }))
     } finally {
-      setIsExecutingRequest(false)
+      setExecutingRequestKey((current) => (current === draftKey ? '' : current))
     }
   }
 
@@ -408,10 +428,6 @@ export function ApiConsole() {
                   responseViewMode={responseViewMode}
                   onResponseViewModeChange={setResponseViewMode}
                 />
-
-                <div className="flex items-center border-t border-border px-4 text-[11px] text-muted-foreground">
-                  In dev, cross-origin requests are proxied through Vite.
-                </div>
               </div>
             </div>
           ) : (
