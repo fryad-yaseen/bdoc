@@ -491,8 +491,12 @@ function operationSupportsBearerAuth(
   return securityEntries.some((entry) => isRecord(entry) && Object.keys(entry).length > 0)
 }
 
-export async function loadOpenApiSpec(sourceUrl: string): Promise<NormalizedSpec> {
-  const response = await fetch(getFetchTarget(sourceUrl))
+export async function loadOpenApiSpec(sourceUrl: string, options?: { bustCache?: boolean }): Promise<NormalizedSpec> {
+  const fetchUrl =
+    options?.bustCache && import.meta.env.DEV
+      ? `${getFetchTarget(sourceUrl)}${sourceUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      : getFetchTarget(sourceUrl)
+  const response = await fetch(fetchUrl)
   if (!response.ok) {
     throw new Error(`Failed to load spec: ${response.status} ${response.statusText}`)
   }
@@ -606,18 +610,16 @@ export function createInitialDraft(operation: ApiOperation): RequestDraftSeed {
   const headerParams: Record<string, string> = {}
 
   for (const parameter of operation.parameters) {
-    const initialValue = parameter.exampleValue || parameter.defaultValue
-
     if (parameter.in === 'path') {
-      pathParams[parameter.name] = initialValue
+      pathParams[parameter.name] = ''
     }
 
     if (parameter.in === 'query') {
-      queryParams[parameter.name] = initialValue
+      queryParams[parameter.name] = ''
     }
 
     if (parameter.in === 'header') {
-      headerParams[parameter.name] = initialValue
+      headerParams[parameter.name] = ''
     }
   }
 

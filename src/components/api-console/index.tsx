@@ -37,8 +37,16 @@ type RequestErrorState = {
   statusText?: string
 }
 
+type RequestSnapshot = {
+  body: string
+  headers: Array<[string, string]>
+  method: string
+  url: string
+}
+
 type RequestStateByOperation = Record<string, RequestResult | null>
 type RequestErrorStateByOperation = Record<string, RequestErrorState | null>
+type RequestSnapshotByOperation = Record<string, RequestSnapshot | null>
 
 function groupOperations(operations: ApiOperation[]) {
   return operations.reduce<Record<string, ApiOperation[]>>((groups, operation) => {
@@ -54,13 +62,17 @@ export function ApiConsole() {
   const minRequestPanelHeight = 240
   const minResponsePanelHeight = 220
   const authToken = useApiConsoleStore((state) => state.authToken)
+  const currentWorkspaceId = useApiConsoleStore((state) => state.currentWorkspaceId)
   const drafts = useApiConsoleStore((state) => state.drafts)
   const savedSpecUrl = useApiConsoleStore((state) => state.specUrl)
   const responseViewMode = useApiConsoleStore((state) => state.responseViewMode)
   const selectedOperationKey = useApiConsoleStore((state) => state.selectedOperationKey)
+  const workspaces = useApiConsoleStore((state) => state.workspaces)
   const ensureDraft = useApiConsoleStore((state) => state.ensureDraft)
   const rememberSpec = useApiConsoleStore((state) => state.rememberSpec)
+  const saveWorkspace = useApiConsoleStore((state) => state.saveWorkspace)
   const setAuthToken = useApiConsoleStore((state) => state.setAuthToken)
+  const setCurrentWorkspaceId = useApiConsoleStore((state) => state.setCurrentWorkspaceId)
   const setBodyValue = useApiConsoleStore((state) => state.setBodyValue)
   const setDraftField = useApiConsoleStore((state) => state.setDraftField)
   const setResponseViewMode = useApiConsoleStore((state) => state.setResponseViewMode)
@@ -68,6 +80,7 @@ export function ApiConsole() {
   const setSelectedOperationKey = useApiConsoleStore((state) => state.setSelectedOperationKey)
   const setSelectedServerUrl = useApiConsoleStore((state) => state.setSelectedServerUrl)
   const setSpecUrl = useApiConsoleStore((state) => state.setSpecUrl)
+  const touchWorkspace = useApiConsoleStore((state) => state.touchWorkspace)
 
   const [specInput, setSpecInput] = useState(savedSpecUrl)
   const [spec, setSpec] = useState<NormalizedSpec | null>(null)
@@ -75,27 +88,40 @@ export function ApiConsole() {
   const [search, setSearch] = useState('')
   const [requestErrorsByOperation, setRequestErrorsByOperation] = useState<RequestErrorStateByOperation>({})
   const [requestResultsByOperation, setRequestResultsByOperation] = useState<RequestStateByOperation>({})
+  const [requestSnapshotsByOperation, setRequestSnapshotsByOperation] = useState<RequestSnapshotByOperation>({})
   const [executingRequestKey, setExecutingRequestKey] = useState('')
   const [activeResponseTab, setActiveResponseTab] = useState<'response' | 'expected'>('response')
-  const [responsePanelHeight, setResponsePanelHeight] = useState(320)
-  const [isPending, startTransition] = useTransition()
+  const [responsePanelHeight, setResponsePanelHeight] = useState(420)
+const [isPending, startTransition] = useTransition()
   const deferredSearch = useDeferredValue(search)
   const contentSplitRef = useRef<HTMLDivElement | null>(null)
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const isManualLoadRef = useRef(false)
+
+  useEffect(() => {
+    setSpecInput(savedSpecUrl)
+  }, [savedSpecUrl])
 
   useEffect(() => {
     if (!savedSpecUrl) return
+    if (isManualLoadRef.current) {
+      isManualLoadRef.current = false
+      return
+    }
     startTransition(async () => {
       try {
         const nextSpec = await loadOpenApiSpec(savedSpecUrl)
         setSpec(nextSpec)
         setLoadError('')
         rememberSpec({ title: nextSpec.title, url: savedSpecUrl })
+        if (currentWorkspaceId) {
+          touchWorkspace(currentWorkspaceId)
+        }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : 'Failed to load the OpenAPI document.')
       }
     })
-  }, [rememberSpec, savedSpecUrl])
+  }, [currentWorkspaceId, rememberSpec, savedSpecUrl, touchWorkspace])
 
   const filteredOperations = useMemo(() => {
     if (!spec) return []
@@ -129,6 +155,7 @@ export function ApiConsole() {
   const activeDraft = draftKey ? drafts[draftKey] : undefined
   const requestResult = draftKey ? requestResultsByOperation[draftKey] ?? null : null
   const requestError = draftKey ? requestErrorsByOperation[draftKey] ?? null : null
+  const requestSnapshot = draftKey ? requestSnapshotsByOperation[draftKey] ?? null : null
   const isExecutingRequest = draftKey.length > 0 && executingRequestKey === draftKey
 
   useEffect(() => {
@@ -139,27 +166,51 @@ export function ApiConsole() {
     })
   }, [draftKey, ensureDraft, selectedOperation, spec])
 
-  const loadSpec = (url: string) => {
+const loadSpec = (url: string, options?: { workspaceId?: string; bustCache?: boolean }) => {
     const trimmedUrl = url.trim()
     if (!trimmedUrl) {
       setLoadError('Enter an OpenAPI JSON URL first.')
       return
     }
+
+    setSpecInput(trimmedUrl)
     setSpecUrl(trimmedUrl)
     startTransition(async () => {
       try {
-        const nextSpec = await loadOpenApiSpec(trimmedUrl)
+        const nextSpec = await loadOpenApiSpec(trimmedUrl, { bustCache: options?.bustCache })
+        const nextWorkspaceId =
+          options?.workspaceId || workspaces.find((workspace) => workspace.url === trimmedUrl)?.id || ''
+
         setSpec(nextSpec)
         setLoadError('')
         setRequestErrorsByOperation({})
         setRequestResultsByOperation({})
+        setRequestSnapshotsByOperation({})
         setExecutingRequestKey('')
         rememberSpec({ title: nextSpec.title, url: trimmedUrl })
         setSelectedOperationKey(nextSpec.operations[0]?.key ?? '')
+        setCurrentWorkspaceId(nextWorkspaceId)
+        if (nextWorkspaceId) {
+          touchWorkspace(nextWorkspaceId)
+        }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : 'Failed to load the OpenAPI document.')
       }
     })
+  }
+
+  const openWorkspace = (workspaceId: string) => {
+    const workspace = workspaces.find((entry) => entry.id === workspaceId)
+    if (!workspace) {
+      return
+    }
+
+    loadSpec(workspace.url, { workspaceId })
+  }
+
+  const saveAndOpenWorkspace = ({ name, url }: { name: string; url: string }) => {
+    const workspaceId = saveWorkspace({ name, url })
+    loadSpec(url, { workspaceId })
   }
 
   const executeRequest = async () => {
@@ -200,11 +251,22 @@ export function ApiConsole() {
         headers.set('Content-Type', selectedContentType)
       }
 
+      const requestBody = selectedBody.trim() ? selectedBody : ''
+      setRequestSnapshotsByOperation((current) => ({
+        ...current,
+        [draftKey]: {
+          body: requestBody,
+          headers: [...headers.entries()],
+          method: selectedOperation.method.toUpperCase(),
+          url,
+        },
+      }))
+
       const startedAt = performance.now()
       const response = await fetch(getFetchTarget(url), {
         method: selectedOperation.method.toUpperCase(),
         headers,
-        body: selectedBody.trim() ? selectedBody : undefined,
+        body: requestBody || undefined,
       })
       const durationMs = performance.now() - startedAt
       const body = await response.text()
@@ -277,16 +339,24 @@ export function ApiConsole() {
     },
   )
 
-  const sidebarContent = (
+const sidebarContent = (
     <Sidebar
+      activeSpecTitle={spec?.title}
+      activeSpecUrl={specInput}
+      currentWorkspaceId={currentWorkspaceId}
       groupedOperations={groupedOperations}
-      onLoadSpec={loadSpec}
+      onOpenUrl={(url) => loadSpec(url)}
+      onOpenWorkspace={openWorkspace}
+      onRefreshSpec={() => {
+          isManualLoadRef.current = true
+          loadSpec(specInput, { bustCache: true })
+        }}
+      onSaveWorkspace={saveAndOpenWorkspace}
       onSelectOperation={setSelectedOperationKey}
       search={search}
       selectedOperationKey={selectedOperationKey}
       setSearch={setSearch}
-      setSpecInput={setSpecInput}
-      specInput={specInput}
+      workspaces={workspaces}
     />
   )
 
@@ -420,6 +490,7 @@ export function ApiConsole() {
 
                 <ResponsePanel
                   operation={selectedOperation}
+                  requestSnapshot={requestSnapshot}
                   result={requestResult}
                   error={requestError}
                   isLoading={isExecutingRequest}

@@ -1,40 +1,60 @@
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { ApiOperation } from '@/lib/openapi'
+import type { Workspace } from '@/stores/api-console-store'
 import { EndpointList } from './endpoint-list'
-import { SpecLoader } from './spec-loader'
+import { WorkspaceSwitcher } from './workspace-switcher'
 
 export function Sidebar({
+  activeSpecTitle,
+  activeSpecUrl,
+  currentWorkspaceId,
   groupedOperations,
-  onLoadSpec,
+  onOpenUrl,
+  onOpenWorkspace,
+  onRefreshSpec,
+  onSaveWorkspace,
   onSelectOperation,
   search,
   selectedOperationKey,
   setSearch,
-  setSpecInput,
-  specInput,
+  workspaces,
 }: {
+  activeSpecTitle?: string
+  activeSpecUrl: string
+  currentWorkspaceId: string
   groupedOperations: Record<string, ApiOperation[]>
-  onLoadSpec: (url: string) => void
+  onOpenUrl: (url: string) => void
+  onOpenWorkspace: (workspaceId: string) => void
+  onRefreshSpec: () => void
+  onSaveWorkspace: (workspace: { name: string; url: string }) => void
   onSelectOperation: (operationKey: string) => void
   search: string
   selectedOperationKey: string
   setSearch: (value: string) => void
-  setSpecInput: (value: string) => void
-  specInput: string
+  workspaces: Workspace[]
 }) {
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border px-3 py-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">bdoc</p>
-        <h1 className="mt-1 text-sm font-semibold">Collections</h1>
+      <div className="flex items-center border-b border-sidebar-border px-3 py-3">
+        <button
+          type="button"
+          onClick={onRefreshSpec}
+          className="text-base font-semibold uppercase tracking-[0.28em] text-sidebar-foreground hover:text-sidebar-foreground/80 cursor-pointer"
+        >
+          BDOC
+        </button>
       </div>
 
       <div className="border-b border-sidebar-border px-3 py-3">
-        <SpecLoader
-          specInput={specInput}
-          setSpecInput={setSpecInput}
-          onLoadSpec={onLoadSpec}
+        <WorkspaceSwitcher
+          activeSpecTitle={activeSpecTitle}
+          activeSpecUrl={activeSpecUrl}
+          currentWorkspaceId={currentWorkspaceId}
+          onOpenUrl={onOpenUrl}
+          onOpenWorkspace={onOpenWorkspace}
+          onSaveWorkspace={onSaveWorkspace}
+          workspaces={workspaces}
         />
       </div>
 

@@ -16,7 +16,7 @@ export function EndpointItem({
   const showSecondaryPath = operation.summary.trim().length > 0 && operation.summary !== fallbackSummary
 
   return (
-    <TooltipProvider delay={120}>
+    <TooltipProvider delay={400}>
       <Tooltip>
         <TooltipTrigger
           render={

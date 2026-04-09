@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import {
   Accordion,
   AccordionContent,
@@ -5,6 +7,9 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Copy01Icon, CopyCheckIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Select,
   SelectContent,
@@ -32,6 +37,105 @@ type RequestErrorState = {
   message: string
   status?: number
   statusText?: string
+}
+
+type RequestSnapshot = {
+  body: string
+  headers: Array<[string, string]>
+  method: string
+  url: string
+}
+
+function formatRawRequest(snapshot: RequestSnapshot) {
+  const requestLine = `${snapshot.method} ${snapshot.url}`
+  const headers = snapshot.headers.map(([name, value]) => `${name}: ${value}`).join('\n')
+
+  if (!headers && !snapshot.body) {
+    return requestLine
+  }
+
+  if (!snapshot.body) {
+    return `${requestLine}\n${headers}`
+  }
+
+  if (!headers) {
+    return `${requestLine}\n\n${snapshot.body}`
+  }
+
+  return `${requestLine}\n${headers}\n\n${snapshot.body}`
+}
+
+function formatRawResponse(result: RequestResult) {
+  const statusLine = `HTTP ${result.status} ${result.statusText}`.trim()
+  const headers = result.headers.map(([name, value]) => `${name}: ${value}`).join('\n')
+
+  if (!headers && !result.body) {
+    return statusLine
+  }
+
+  if (!result.body) {
+    return `${statusLine}\n${headers}`
+  }
+
+  if (!headers) {
+    return `${statusLine}\n\n${result.body}`
+  }
+
+  return `${statusLine}\n${headers}\n\n${result.body}`
+}
+
+function CopyTextButton({
+  text,
+  label,
+}: {
+  text: string
+  label: string
+}) {
+  const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  useEffect(() => {
+    if (status === 'idle') {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setStatus('idle')
+    }, 1600)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [status])
+
+  const handleClick = async () => {
+    if (!text) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setStatus('copied')
+    } catch {
+      setStatus('failed')
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="icon-sm"
+      onClick={() => void handleClick()}
+      disabled={!text}
+      aria-label={status === 'copied' ? `${label} copied` : status === 'failed' ? `${label} failed` : label}
+      title={status === 'copied' ? `${label} copied` : status === 'failed' ? `${label} failed` : label}
+    >
+      <HugeiconsIcon
+        icon={status === 'copied' ? CopyCheckIcon : Copy01Icon}
+        strokeWidth={2}
+      />
+      <span className="sr-only">
+        {status === 'copied' ? `${label} copied` : status === 'failed' ? `${label} failed` : label}
+      </span>
+    </Button>
+  )
 }
 
 function ResponseBodyContent({
@@ -66,8 +170,32 @@ function ResponseBodyContent({
   )
 }
 
+function RawPayloadPanel({
+  body,
+  copyLabel,
+  emptyLabel,
+}: {
+  body: string
+  copyLabel: string
+  emptyLabel: string
+}) {
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      <div className="flex justify-end">
+        <CopyTextButton text={body} label={copyLabel} />
+      </div>
+      <div className="h-full min-w-0 overflow-x-auto overflow-y-auto border border-border bg-background">
+        <pre className="min-w-max p-3 text-xs leading-5 font-mono whitespace-pre [overflow-wrap:normal] [word-break:normal]">
+          {body || emptyLabel}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
 export function ResponsePanel({
   operation,
+  requestSnapshot,
   result,
   error,
   isLoading,
@@ -77,6 +205,7 @@ export function ResponsePanel({
   onResponseViewModeChange,
 }: {
   operation: ApiOperation
+  requestSnapshot: RequestSnapshot | null
   result: RequestResult | null
   error: RequestErrorState | null
   isLoading: boolean
@@ -85,6 +214,12 @@ export function ResponsePanel({
   responseViewMode: ResponseViewMode
   onResponseViewModeChange: (value: ResponseViewMode) => void
 }) {
+  const responseBody = result?.body ?? error?.body ?? ''
+  const hasResponseBody = responseBody.trim().length > 0
+  const rawRequest = requestSnapshot ? formatRawRequest(requestSnapshot) : ''
+  const rawResponse = result ? formatRawResponse(result) : ''
+  const hasRawResponse = rawResponse.trim().length > 0
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col border-t border-border bg-card">
       {error ? (
@@ -129,102 +264,114 @@ export function ResponsePanel({
                 Waiting for response...
               </span>
             </div>
-          ) : result ? (
+          ) : result || error || requestSnapshot ? (
             <Tabs defaultValue="body" className="min-h-0 flex h-full flex-col">
               <TabsList variant="line" className="border-b border-border px-4">
                 <TabsTrigger value="body">Body</TabsTrigger>
-                <TabsTrigger value="headers">
-                  Headers ({result.headers.length})
-                </TabsTrigger>
+                {result ? (
+                  <TabsTrigger value="headers">
+                    Headers ({result.headers.length})
+                  </TabsTrigger>
+                ) : null}
+                {requestSnapshot ? <TabsTrigger value="raw-request">Raw Request</TabsTrigger> : null}
+                <TabsTrigger value="raw-response">Raw Response</TabsTrigger>
               </TabsList>
 
               <TabsContent value="body" className="min-h-0 min-w-0 flex-1 px-4 py-4">
                 <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={result.ok ? 'secondary' : 'destructive'}>
-                        {result.status} {result.statusText}
-                      </Badge>
-                      <Badge variant="outline">
-                        {Math.round(result.durationMs)} ms
-                      </Badge>
+                      {result ? (
+                        <>
+                          <Badge variant={result.ok ? 'secondary' : 'destructive'}>
+                            {result.status} {result.statusText}
+                          </Badge>
+                          <Badge variant="outline">
+                            {Math.round(result.durationMs)} ms
+                          </Badge>
+                        </>
+                      ) : error?.status ? (
+                        <>
+                          <Badge variant="destructive">
+                            {error.status} {error.statusText}
+                          </Badge>
+                          <Badge variant="outline">Request error</Badge>
+                        </>
+                      ) : (
+                        <Badge variant="outline">Request error</Badge>
+                      )}
                     </div>
 
-                    <Select
-                      value={responseViewMode}
-                      onValueChange={(value) => onResponseViewModeChange(value as ResponseViewMode)}
-                    >
-                      <SelectTrigger size="sm" className="w-auto bg-background">
-                        <SelectValue placeholder="Viewer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="json">JSON</SelectItem>
-                        <SelectItem value="text">Plain text</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CopyTextButton text={responseBody} label="Copy body" />
+                      <Select
+                        value={responseViewMode}
+                        onValueChange={(value) => onResponseViewModeChange(value as ResponseViewMode)}
+                      >
+                        <SelectTrigger size="sm" className="w-auto bg-background">
+                          <SelectValue placeholder="Viewer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Auto</SelectItem>
+                          <SelectItem value="json">JSON</SelectItem>
+                          <SelectItem value="text">Plain text</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="h-full min-w-0 overflow-x-auto overflow-y-auto border border-border bg-background">
-                    <ResponseBodyContent body={result.body} responseViewMode={responseViewMode} />
+                    <ResponseBodyContent
+                      body={responseBody}
+                      responseViewMode={responseViewMode}
+                      emptyLabel={hasResponseBody ? 'Empty response body' : 'No response body returned.'}
+                    />
                   </div>
                 </div>
               </TabsContent>
 
-              <TabsContent value="headers" className="min-h-0 flex-1 px-4 py-4">
-                <div className="h-full overflow-auto border border-border">
-                  <Table>
-                    <TableBody>
-                      {result.headers.map(([name, value]) => (
-                        <TableRow key={name}>
-                          <TableCell className="font-medium text-sm">{name}</TableCell>
-                          <TableCell className="whitespace-normal break-all text-sm text-muted-foreground">
-                            {value}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+              {result ? (
+                <TabsContent value="headers" className="min-h-0 flex-1 px-4 py-4">
+                  <div className="h-full overflow-auto border border-border">
+                    <Table>
+                      <TableBody>
+                        {result.headers.map(([name, value]) => (
+                          <TableRow key={name}>
+                            <TableCell className="font-medium text-sm">{name}</TableCell>
+                            <TableCell className="whitespace-normal break-all text-sm text-muted-foreground">
+                              {value}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              ) : null}
+
+              {requestSnapshot ? (
+                <TabsContent value="raw-request" className="min-h-0 flex-1 px-4 py-4">
+                  <RawPayloadPanel
+                    body={rawRequest}
+                    copyLabel="Copy request"
+                    emptyLabel="No raw request captured."
+                  />
+                </TabsContent>
+              ) : null}
+
+              <TabsContent value="raw-response" className="min-h-0 flex-1 px-4 py-4">
+                {result ? (
+                  <RawPayloadPanel
+                    body={rawResponse}
+                    copyLabel="Copy response"
+                    emptyLabel="No raw response captured."
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center border border-border bg-background px-4 py-8 text-sm text-muted-foreground">
+                    {error?.message ?? (hasRawResponse ? '' : 'No response was returned.')}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
-          ) : error ? (
-            <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 px-4 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {error.status ? (
-                  <Badge variant="destructive">
-                    {error.status} {error.statusText}
-                  </Badge>
-                ) : null}
-                <Badge variant="outline">Request error</Badge>
-              </div>
-
-              {error.body ? (
-                <>
-                  <div className="flex justify-end">
-                    <Select
-                      value={responseViewMode}
-                      onValueChange={(value) => onResponseViewModeChange(value as ResponseViewMode)}
-                    >
-                      <SelectTrigger size="sm" className="w-auto bg-background">
-                        <SelectValue placeholder="Viewer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="json">JSON</SelectItem>
-                        <SelectItem value="text">Plain text</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="h-full min-w-0 overflow-x-auto overflow-y-auto border border-border bg-background">
-                    <ResponseBodyContent body={error.body} responseViewMode={responseViewMode} />
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full items-center justify-center border border-border bg-background px-4 py-8 text-sm text-muted-foreground">
-                  {error.message}
-                </div>
-              )}
-            </div>
           ) : (
             <div className="flex h-full items-center justify-center px-4 py-8 text-sm text-muted-foreground">
               Send a request to get a response.

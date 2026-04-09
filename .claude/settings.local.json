@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__browser__open",
+      "mcp__browser__screenshot",
+      "mcp__browser__playwright",
+      "mcp__browser__console_logs",
+      "Bash(netstat -ano)",
+      "Bash(grep -r \"api-console\\\\|/api\\\\|/console\" /c/Users/Dwrandaz/projects/other/bdoc/src --include=*.tsx --include=*.ts)",
+      "mcp__browser__close"
+    ]
+  }
+}
