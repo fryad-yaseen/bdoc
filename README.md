@@ -1,75 +1,111 @@
-# React + TypeScript + Vite
+# bdoc
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+`bdoc` is a browser-based OpenAPI explorer and request runner. It loads a remote OpenAPI 3.x JSON document, builds a browsable endpoint tree, lets you edit params and request bodies inline, and sends requests directly from the UI.
 
-Currently, two official plugins are available:
+## What It Does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Loads remote OpenAPI 3.x JSON specs
+- Groups and searches operations by tag, method, path, and summary
+- Builds request forms for path, query, header, and body inputs
+- Supports bearer auth when the spec defines it
+- Sends live requests and shows response body, headers, and timing
+- Persists auth, selected specs, workspaces, and request drafts in local storage
+- Merges saved JSON request bodies with updated spec examples so newly added fields appear without wiping existing values
 
-## React Compiler
+## Stack
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+- React 19
+- TypeScript
+- Vite
+- TanStack Router
+- Zustand
+- Tailwind CSS 4
 
-Note: This will impact Vite dev & build performances.
+## Requirements
 
-## Expanding the ESLint configuration
+- Node.js 20+ recommended
+- pnpm
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open the local Vite URL printed in the terminal, then paste an OpenAPI JSON URL into the app and load it.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Available Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm dev
+pnpm build
+pnpm preview
+pnpm lint
 ```
+
+## How It Works
+
+### Loading a Spec
+
+Enter a public OpenAPI JSON URL in the sidebar and load it. The app currently supports OpenAPI 3.x JSON documents.
+
+### Editing Requests
+
+For each operation, `bdoc` generates editable sections for:
+
+- Path parameters
+- Query parameters
+- Header parameters
+- Request body content types
+- Bearer token auth
+
+### Sending Requests
+
+Requests are executed from the browser UI. The response panel shows:
+
+- Parsed or raw response body
+- Response headers
+- Request snapshot
+- Expected response examples from the spec
+- Duration and status
+
+## Persistence Behavior
+
+The app stores console state in `localStorage` under the `bdoc-console` key.
+
+Persisted state includes:
+
+- Auth token
+- Recent specs
+- Saved workspaces
+- Selected operation
+- Draft params and request bodies per operation
+
+For JSON request bodies, saved drafts are merged with the latest generated example when the spec changes. That means:
+
+- Existing user-entered values are preserved
+- New fields introduced by the API spec are added into the saved body
+- Non-JSON bodies are left untouched
+
+## Dev Proxy
+
+In development, Vite mounts a local proxy at `/__bdoc_proxy` so the app can fetch remote specs and send cross-origin API requests without browser CORS failures during local work.
+
+This proxy is a development convenience, not a production backend.
+
+## Project Structure
+
+```text
+src/
+  components/api-console/   Main console UI
+  lib/openapi.ts            OpenAPI parsing and draft seeding
+  stores/api-console-store.ts  Persisted console state
+  routes/                   TanStack Router routes
+```
+
+## Notes
+
+- The app expects JSON specs, not YAML.
+- If a remote API blocks requests or requires private network access, the browser app will still be limited by your environment.
+- Production deployment may need a server-side proxy depending on the APIs you want to call.
